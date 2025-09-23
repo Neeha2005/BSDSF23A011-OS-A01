@@ -1,16 +1,12 @@
-# Makefile inside src/
-
 CC      := gcc
-CFLAGS  := -Wall -Wextra -std=c11 -I../include
-AR      := ar
-ARFLAGS := rcs
+CFLAGS  := -Wall -Wextra -std=c11 -I../include -fPIC
 
 OBJDIR  := ../obj
 BINDIR  := ../bin
 LIBDIR  := ../lib
 
-TARGET  := $(BINDIR)/client
-LIBNAME := libmyutils.a
+TARGET  := $(BINDIR)/client_dynamic
+LIBNAME := libmyutils.so
 LIB     := $(LIBDIR)/$(LIBNAME)
 
 # only the utility sources go into the library
@@ -27,21 +23,30 @@ build: dirs $(TARGET)
 dirs:
 	mkdir -p $(OBJDIR) $(BINDIR) $(LIBDIR)
 
-# compile any .c into obj dir
 $(OBJDIR)/%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# build static library from utility objects
+# build dynamic library from utility objects
 $(LIB): $(UTIL_OBJECTS)
-	$(AR) $(ARFLAGS) $(LIB) $(UTIL_OBJECTS)
+	$(CC) -shared -o $(LIB) $(UTIL_OBJECTS)
 
-# link main with the static library
+# link main with the dynamic library
 $(TARGET): $(MAIN_OBJECT) $(LIB)
-	$(CC) $(CFLAGS) $(MAIN_OBJECT) $(LIB) -o $(TARGET)
+	$(CC) $(CFLAGS) $(MAIN_OBJECT) -L$(LIBDIR) -lmyutils -o $(TARGET)
 
 run: build
-	./$(TARGET)
+	LD_LIBRARY_PATH=$(LIBDIR) ./$(TARGET)
 
 clean:
 	rm -rf $(OBJDIR) $(BINDIR) $(LIBDIR)
 
+PREFIX ?= /usr/local
+
+install: build
+	# install the binary
+	install -d $(PREFIX)/bin
+	install -m 755 ../bin/client_dynamic $(PREFIX)/bin/client
+
+	# install man pages
+	install -d $(PREFIX)/share/man/man1
+	install -m 644 ../man/man3/*.1 $(PREFIX)/share/man/man1
